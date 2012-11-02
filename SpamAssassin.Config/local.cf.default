@@ -39,7 +39,7 @@ required_score 5.0
 #   Use Bayesian classifier (default: 1)
 #
 use_bayes 1
-bayes_path /var/amavis/.spamassassin/bayes
+bayes_path /Library/Server/Mail/Data/scanner/amavis/.spamassassin/bayes
 
 
 #   Bayesian classifier auto-learning (default: 1)

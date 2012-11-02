@@ -18,13 +18,20 @@ PROJECT_OS_DIR	 = $(Project).OpenSourceInfo
 PROJECT_PATCH_DIR	= $(Project).Patch
 PROJECT_SETUP_DIR	= $(Project).SetupExtras
 
-CONFIG_DIR	 = $(ETCDIR)/mail/spamassassin
-V310_PRE	 = $(DSTROOT)$(CONFIG_DIR)/v310.pre
-V310_PRE_TMP = $(DSTROOT)$(CONFIG_DIR)/v310.pre.tmp
+DATA_DIR	= /Library/Server/Mail/Data/scanner/spamassassin
+CONFIG_DIR	= /Library/Server/Mail/Config/spamassassin
+V310_PRE	= $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/v310.pre
+V310_PRE_TMP	= $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/v310.pre.tmp
+
+SETUP_SA=$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/CommonExtras/62-setup_spamassassin.sh
+PROMO_SA=$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/PromotionExtras/62-setup_spamassassin.sh
+
+SA_LEARN=$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/learn_junk_mail.sh
+SA_UPDATE=$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_update.sh
 
 CONFIG_ENV	= MAKEOBJDIR="$(BuildDirectory)" \
-            INSTALL_ROOT="$(DSTROOT)" \
-            TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
+			INSTALL_ROOT="$(DSTROOT)" \
+			TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
 
 CFLAGS		= -g -Os $(RC_CFLAGS)
 LDFLAGS		= $(CFLAGS)
@@ -46,8 +53,8 @@ PERL_BUILD_VERS := $(filter-out $(PERL_DEFAULT),$(PERL_UNORDERED_VERS)) $(PERL_D
 # Environment is passed to BOTH configure AND make, which can cause problems if these
 # variables are intended to help configure, but not override the result.
 Environment	= MAKEOBJDIR="$(BuildDirectory)" \
-            INSTALL_ROOT="$(DSTROOT)" \
-            TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
+			INSTALL_ROOT="$(DSTROOT)" \
+			TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
 
 # This allows extra variables to be passed _just_ to configure.
 Extra_Configure_Environment =
@@ -56,10 +63,11 @@ Make_Flags	=
 
 ProjectConfig		= $(DSTROOT)$(USRINCLUDEDIR)/$(Project)/$(Project)-config
 
-Common_Configure_Flags	= Makefile.PL PREFIX=/ \
-							INSTALLSITEDATA=$(VARDIR)/spamassassin/3.003002 \
-							INSTALLSITECONF=$(ETCDIR)/mail/spamassassin \
-							ENABLE_SSL=yes
+Common_Configure_Flags  = Makefile.PL PREFIX=$(SERVER_INSTALL_PATH_PREFIX)/ \
+					LOCALSTATEDIR=/Library/Server/Mail/Data/scanner/spamassassin \
+					INSTALLSITEDATA=/Library/Server/Mail/Data/scanner/spamassassin/3.003002 \
+					INSTALLSITECONF=/Library/Server/Mail/Config/spamassassin \
+					ENABLE_SSL=no
 
 # Include common makefile targets for B&I
 include $(MAKEFILEPATH)/CoreOS/ReleaseControl/Common.make
@@ -77,8 +85,8 @@ TMPDIR			= $(OBJROOT)/Build/tmp
 Install_Flags	= DESTDIR="$(DSTROOT)"
 
 # Typically defined in GNUSource.make; duplicated here to effect similar functionality.
-Sources				= $(SRCROOT)
-Configure			= perl
+Sources			= $(SRCROOT)
+Configure		= perl
 ConfigureProject	= $(Configure)
 ProjectConfigStamp	= $(BuildDirectory)/$(Project)/configure-stamp
 
@@ -87,6 +95,9 @@ LIB_TOOL			= $(BuildDirectory)/$(Project)/libtool
 .PHONY: build-sa
 .PHONY: archive-strip-binaries install-extras install-man install-startup-files
 .PHONY: install-open-source-files
+
+# Unbundling install paths
+include /AppleInternal/ServerTools/ServerBuildVariables.xcconfig
 
 default : clean build-sa
 
@@ -101,13 +112,13 @@ build-sa : $(BUILD_DIR) $(TMPDIR)
 	@echo "***** Building $(Project)"
 	$(_v) for vers in $(PERL_BUILD_VERS); do \
 		export VERSIONER_PERL_VERSION=$${vers}; \
-		cd $(BuildDirectory) && gnutar -xzpf $(Sources)/$(PROJECT_BIN_DIR)/$(SPAM_TAR_GZ); \
+		cd $(BuildDirectory) && /usr/bin/tar -xzpf $(Sources)/$(PROJECT_BIN_DIR)/$(SPAM_TAR_GZ); \
 		$(MV) $(BuildDirectory)/$(OPEN_SOURCE_DIR) $(BuildDirectory)/$(Project)-$${vers}; \
 		cd "$(BuildDirectory)/$(Project)-$${vers}" && \
 				$(PATCH) -p1 < "$(SRCROOT)/$(PROJECT_PATCH_DIR)/patch-1.diff"; \
 		cd $(BuildDirectory)/$(Project)-$${vers} && \
 				$(Environment) $(ConfigureProject) $(Common_Configure_Flags) \
-					LIB=/System/Library/Perl/Extras/$${vers} PERL_VERSION=$${vers}; \
+					LIB=$(SERVER_INSTALL_PATH_PREFIX)/System/Library/Perl/Extras/$${vers} PERL_VERSION=$${vers}; \
 		$(_v) $(MAKE) -C $(BuildDirectory)/$(Project)-$${vers} CFLAGS="$(CFLAGS)" $(Make_Flags) $(Install_Flags) $(Install_Target); \
 	done
 	@echo "***** Building $(Project) complete."
@@ -122,63 +133,66 @@ $(DSTROOT)$(USRLIBDIR)/$(Project)/$(Project)-config:
 do-cleanup :
 	@echo "***** Cleaning up files not intended for installation"
 	# remove installed local.cf file
-	$(_v) $(RM) $(DSTROOT)$(CONFIG_DIR)/local.cf
+	$(_v) $(RM) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/local.cf
 
 	# cleanup perl directories
 	$(_v) find $(DSTROOT) -name \*.bs -delete
 	$(_v) find $(DSTROOT) -name perllocal.pod -delete
 	$(_v) find $(DSTROOT) -type d -empty -delete
 	$(_v) find $(DSTROOT) -name darwin-thread-multi-2level -delete
-	$(_v) $(RMDIR) $(SYMROOT)$(ETCDIR)
-	$(_v) $(RMDIR) $(SYMROOT)$(SHAREDIR)
+	$(_v) $(RMDIR) $(SYMROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)
+	$(_v) $(RMDIR) $(SYMROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)
 	@echo "***** Cleaning up complete."
 
 archive-strip-binaries: $(SYMROOT)
 	@echo "***** Archiving, dSYMing and stripping binaries..."
-	$(_v) for file in $(DSTROOT)$(USRBINDIR)/spamc;\
-	do \
-		echo "Processing $${file##*/} (from $${file})";	\
-		$(DSYMUTIL) --out=$(SYMROOT)/$${file##*/}.dSYM $${file};\
-		$(STRIP) -S $${file};	\
-	done
+	$(_v) if [ -e "$(BUILD_DIR)/$(Project)-$(PERL_SUB_DEFAULT)/spamc/spamc" ]; then \
+		$(CP) "$(BUILD_DIR)/$(Project)-$(PERL_SUB_DEFAULT)/spamc/spamc" "$(SYMROOT)/"; \
+	fi
+	$(_v) if [ -e "$(BUILD_DIR)/$(Project)-$(PERL_SUB_DEFAULT)/spamc/spamc.dSYM" ]; then \
+		$(CP) "$(BUILD_DIR)/$(Project)-$(PERL_SUB_DEFAULT)/spamc/spamc.dSYM" "$(SYMROOT)/"; \
+	fi
+	$(_v) if [ -e "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)/spamc" ]; then \
+		$(STRIP) -S "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)/spamc";	\
+	fi
 	@echo "***** Archiving, dSYMing and stripping binaries complete."
 
 normalize-directories :
 	@echo "***** Making standard directory paths..."
 	# Create & merge into /private/etc
-	$(_v) if [ ! -d "$(DSTROOT)$(ETCDIR)" ]; then	\
-		echo "$(MKDIR) $(DSTROOT)$(ETCDIR)";		\
-		$(MKDIR) "$(DSTROOT)$(ETCDIR)";	\
+	$(_v) if [ ! -d "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)" ]; then	\
+		echo "$(MKDIR) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)";		\
+		$(MKDIR) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)";	\
 	fi
-	$(_v) if [ -e "$(DSTROOT)/etc" -a "$(ETCDIR)" != "/etc" ]; then	\
-		echo "$(MV) $(DSTROOT)/etc/* $(DSTROOT)$(ETCDIR)";	\
-		$(MV) "$(DSTROOT)/etc/"* "$(DSTROOT)$(ETCDIR)/";	\
+	$(_v) if [ -e "$(DSTROOT)/etc" -a "$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)" != "/etc" ]; then	\
+		echo "$(MV) $(DSTROOT)/etc/* $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)";	\
+		$(MV) "$(DSTROOT)/etc/"* "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(ETCDIR)/";	\
 		echo "$(RMDIR) $(DSTROOT)/etc";	\
 		$(RMDIR) "$(DSTROOT)/etc";	\
 	fi
 
 	# Create & merge into /usr/bin
-	$(_v) if [ ! -d "$(DSTROOT)$(USRBINDIR)" ]; then	\
-		echo "$(MKDIR) $(DSTROOT)$(USRBINDIR)";		\
-		$(MKDIR) "$(DSTROOT)$(USRBINDIR)";	\
+	$(_v) if [ ! -d "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)" ]; then	\
+		echo "$(MKDIR) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)";		\
+		$(MKDIR) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)";	\
 	fi
-	$(_v) if [ -e "$(DSTROOT)/bin" -a "$(USRBINDIR)" != "/bin" ]; then	\
-		echo "$(MV) $(DSTROOT)/bin/* $(DSTROOT)$(USRBINDIR)";	\
-		$(MV) "$(DSTROOT)/bin/"* "$(DSTROOT)$(USRBINDIR)/";	\
-		echo "$(RMDIR) $(DSTROOT)/bin";	\
-		$(RMDIR) "$(DSTROOT)/bin";	\
+	$(_v) if [ -e "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/bin" -a "$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)" != "/bin" ]; then	\
+		echo "$(MV) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/bin/* $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)";	\
+		$(MV) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/bin/"* "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(USRBINDIR)/";	\
+		echo "$(RMDIR) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/bin";	\
+		$(RMDIR) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/bin";	\
 	fi
 
 	# Create & merge into /usr/share
-	$(_v) if [ ! -d "$(DSTROOT)$(SHAREDIR)" ]; then	\
-		echo "$(MKDIR) $(DSTROOT)$(SHAREDIR)";		\
-		$(MKDIR) "$(DSTROOT)$(SHAREDIR)";	\
+	$(_v) if [ ! -d "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)" ]; then	\
+		echo "**: $(MKDIR) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)";		\
+		$(MKDIR) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)";	\
 	fi
-	$(_v) if [ -e "$(DSTROOT)/share" -a "$(SHAREDIR)" != "/share" ]; then	\
-		echo "$(MV) $(DSTROOT)/share/* $(DSTROOT)$(SHAREDIR)";	\
-		$(MV) "$(DSTROOT)/share/"* "$(DSTROOT)$(SHAREDIR)/";	\
-		echo "$(RMDIR) $(DSTROOT)/share";	\
-		$(RMDIR) "$(DSTROOT)/share";	\
+	$(_v) if [ -e "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/share" -a "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)" != "/share" ]; then	\
+		echo "$(MV) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/share/* $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)";	\
+		$(MV) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/share/"* "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(SHAREDIR)/";	\
+		echo "$(RMDIR) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/share";	\
+		$(RMDIR) "$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/share";	\
 	fi
 	@echo "***** Making standard directory paths complete."
 
@@ -186,30 +200,53 @@ install-open-source-files :
 	@echo "***** Installing open source configuration files..."
 	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(USRDIR)/local/OpenSourceVersions
 	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(USRDIR)/local/OpenSourceLicenses
-	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_OS_DIR)/$(Project).plist" \
-				  "$(DSTROOT)$(USRDIR)/local/OpenSourceVersions"
-	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_OS_DIR)/$(Project).txt" \
-				  "$(DSTROOT)$(USRDIR)/local/OpenSourceLicenses"
+	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_OS_DIR)/$(Project).plist" "$(DSTROOT)$(USRDIR)/local/OpenSourceVersions"
+	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_OS_DIR)/$(Project).txt" "$(DSTROOT)$(USRDIR)/local/OpenSourceLicenses"
 	@echo "***** Installing open source configuration files complete."
 
 install-extras : install-open-source-files
 	@echo "***** Installing extras..."
+	# move promotion data
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail
+	$(_v) $(MV) $(DSTROOT)$(CONFIG_DIR) \
+		$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/
+	$(_v) $(MV) $(DSTROOT)$(DATA_DIR)/3.003002 \
+		$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/
+	$(_v) $(RM) -rf $(DSTROOT)/Library
+
 	# install directories
-	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(NSLIBRARYDIR)/ServerSetup/CommonExtras
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/CommonExtras
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/PromotionExtras
 
 	# Service configuration file
 	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_CONF_DIR)/local.cf.default \
-			$(DSTROOT)$(CONFIG_DIR)/local.cf.default
+			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/local.cf.default
 
 	# Service setup script
-	$(_v) $(INSTALL_SCRIPT) $(SRCROOT)/$(PROJECT_SETUP_DIR)/SetupSpamAssassin.sh \
-			$(DSTROOT)$(NSLIBRARYDIR)/ServerSetup/CommonExtras/SetupSpamAssassin.sh
+	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/SetupSpamAssassin.sh" >> "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SETUP_SA)")
+	$(_v) install -m 0755 "$(DSTROOT)/$(SETUP_SA)"  "$(DSTROOT)/$(PROMO_SA)"
 
 	# Service runtime scripts
-	$(_v) $(INSTALL_SCRIPT) $(SRCROOT)/$(PROJECT_SETUP_DIR)/learn_junk_mail \
-			$(DSTROOT)$(CONFIG_DIR)/learn_junk_mail.sh
-	$(_v) $(INSTALL_SCRIPT) $(SRCROOT)/$(PROJECT_SETUP_DIR)/sa_update \
-			$(DSTROOT)$(CONFIG_DIR)/sa_update.sh
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin
+	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/learn_junk_mail" >> "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_LEARN)")
+
+	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/sa_update" >> "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_UPDATE)")
+
 	$(_v) $(SED) -e 's/#loadplugin Mail::SpamAssassin::Plugin::TextCat/loadplugin Mail::SpamAssassin::Plugin::TextCat/' \
 			"$(V310_PRE)" > "$(V310_PRE_TMP)"
 	$(_v) $(RM) "$(V310_PRE)"
@@ -218,11 +255,15 @@ install-extras : install-open-source-files
 
 install-startup-files :
 	@echo "***** Installing Startup Item..."
-	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(NSLIBRARYDIR)/LaunchDaemons
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons
 	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_LD_DIR)/com.apple.salearn.plist \
-			$(DSTROOT)/System/Library/LaunchDaemons/com.apple.salearn.plist
+			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.salearn.plist
 	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_LD_DIR)/com.apple.updatesa.plist \
-			$(DSTROOT)/System/Library/LaunchDaemons/com.apple.updatesa.plist
+			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.updatesa.plist
+	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/learn_junk_mail.sh' \
+			"$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.salearn.plist"
+	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/bin/sa-update' \
+			"$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.updatesa.plist"
 	@echo "***** Installing Startup Item complete."
 
 $(DSTROOT) $(TMPDIR) :
