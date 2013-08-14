@@ -5,10 +5,10 @@
 	<key>Label</key>
 	<string>com.apple.salearn</string>
 	<key>Program</key>
-	<string>/etc/mail/spamassassin/learn_junk_mail.sh</string>
+	<string>/etc/mail/spamassassin/sa_learn.pl</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>learn_junk_mail.sh</string>
+		<string>sa_learn.pl</string>
 	</array>
         <key>StartCalendarInterval</key>
 	<dict>
@@ -17,5 +17,7 @@
 		<key>Minute</key>
 		<integer>15</integer>
 	</dict>
+	<key>PreventsSleep</key>
+	<true/>
 </dict>
 </plist>

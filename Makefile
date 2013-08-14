@@ -2,59 +2,60 @@
 # xbs-compatible wrapper Makefile for SpamAssassin
 #
 
-Project		= SpamAssassin
-OPEN_SOURCE_VER	= 3.3.2
-PROJECT_VERSION	= $(Project)-$(OPEN_SOURCE_VER)
+Project         = SpamAssassin
+OPEN_SOURCE_VER = 3.3.2
+PROJECT_VERSION = $(Project)-$(OPEN_SOURCE_VER)
 
 # Configuration values we customize
-#
-OPEN_SOURCE_DIR	= Mail-$(PROJECT_VERSION)
-SPAM_TAR_GZ		= $(OPEN_SOURCE_DIR).tar.gz
+OPEN_SOURCE_DIR = Mail-$(PROJECT_VERSION)
+SPAM_TAR_GZ     = $(OPEN_SOURCE_DIR).tar.gz
 
-PROJECT_BIN_DIR	 = $(Project).Bin
-PROJECT_CONF_DIR = $(Project).Config
-PROJECT_LD_DIR	 = $(Project).LaunchDaemons
-PROJECT_OS_DIR	 = $(Project).OpenSourceInfo
+PROJECT_BIN_DIR		= $(Project).Bin
+PROJECT_CONF_DIR	= $(Project).Config
+PROJECT_LD_DIR		= $(Project).LaunchDaemons
+PROJECT_OS_DIR		= $(Project).OpenSourceInfo
 PROJECT_PATCH_DIR	= $(Project).Patch
 PROJECT_SETUP_DIR	= $(Project).SetupExtras
 
-DATA_DIR	= /Library/Server/Mail/Data/scanner/spamassassin
-CONFIG_DIR	= /Library/Server/Mail/Config/spamassassin
-V310_PRE	= $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/v310.pre
+DATA_DIR		= /Library/Server/Mail/Data/scanner/spamassassin
+CONFIG_DIR		= /Library/Server/Mail/Config/spamassassin
+V310_PRE		= $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/v310.pre
 V310_PRE_TMP	= $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/v310.pre.tmp
 
-SETUP_SA=$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/CommonExtras/62-setup_spamassassin.sh
-PROMO_SA=$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/PromotionExtras/62-setup_spamassassin.sh
+PROMO_DIR			= $(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/PromotionExtras
+SRC_PROMO_SCRIPT	= service_promotion.pl
+DST_PROMO_SCRIPT	= 62-mail_services_filter.pl
 
-SA_LEARN=$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/learn_junk_mail.sh
-SA_UPDATE=$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_update.sh
+HEADER_TEXT	   = header.txt
+SA_LEARN_PATH  = $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_learn.pl
+SA_UPDATE_PATH = $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_update.pl
 
 CONFIG_ENV	= MAKEOBJDIR="$(BuildDirectory)" \
-			INSTALL_ROOT="$(DSTROOT)" \
-			TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
+				INSTALL_ROOT="$(DSTROOT)" \
+				TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
 
 CFLAGS		= -g -Os $(RC_CFLAGS)
 LDFLAGS		= $(CFLAGS)
 
-DSYMUTIL=/usr/bin/dsymutil
+DSYMUTIL	= /usr/bin/dsymutil
 
 # multi-version support
-VERSIONER_DIR := /usr/local/versioner
+VERSIONER_DIR		:= /usr/local/versioner
 
 # Perl multi-version support
-PERL_VERSIONS := $(VERSIONER_DIR)/perl/versions
-PERL_SUB_DEFAULT := $(shell sed -n '/^DEFAULT = /s///p' $(PERL_VERSIONS))
-PERL_DEFAULT := $(shell grep '^$(PERL_SUB_DEFAULT)' $(PERL_VERSIONS))
+PERL_VERSIONS		:= $(VERSIONER_DIR)/perl/versions
+PERL_SUB_DEFAULT	:= $(shell sed -n '/^DEFAULT = /s///p' $(PERL_VERSIONS))
+PERL_DEFAULT		:= $(shell grep '^$(PERL_SUB_DEFAULT)' $(PERL_VERSIONS))
 PERL_UNORDERED_VERS := $(shell grep -v '^DEFAULT' $(PERL_VERSIONS))
 
 # do default version last
-PERL_BUILD_VERS := $(filter-out $(PERL_DEFAULT),$(PERL_UNORDERED_VERS)) $(PERL_DEFAULT)
+PERL_BUILD_VERS		:= $(filter-out $(PERL_DEFAULT),$(PERL_UNORDERED_VERS)) $(PERL_DEFAULT)
 
 # Environment is passed to BOTH configure AND make, which can cause problems if these
 # variables are intended to help configure, but not override the result.
 Environment	= MAKEOBJDIR="$(BuildDirectory)" \
-			INSTALL_ROOT="$(DSTROOT)" \
-			TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
+				INSTALL_ROOT="$(DSTROOT)" \
+				TMPDIR="$(TMPDIR)" TEMPDIR="$(TMPDIR)"
 
 # This allows extra variables to be passed _just_ to configure.
 Extra_Configure_Environment =
@@ -85,8 +86,8 @@ TMPDIR			= $(OBJROOT)/Build/tmp
 Install_Flags	= DESTDIR="$(DSTROOT)"
 
 # Typically defined in GNUSource.make; duplicated here to effect similar functionality.
-Sources			= $(SRCROOT)
-Configure		= perl
+Sources				= $(SRCROOT)
+Configure			= perl
 ConfigureProject	= $(Configure)
 ProjectConfigStamp	= $(BuildDirectory)/$(Project)/configure-stamp
 
@@ -215,7 +216,6 @@ install-extras : install-open-source-files
 	$(_v) $(RM) -rf $(DSTROOT)/Library
 
 	# install directories
-	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/CommonExtras
 	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/ServerSetup/PromotionExtras
 
 	# Service configuration file
@@ -223,29 +223,17 @@ install-extras : install-open-source-files
 			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/private/etc/mail/spamassassin/local.cf.default
 
 	# Service setup script
-	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/SetupSpamAssassin.sh" >> "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SETUP_SA)")
-	$(_v) install -m 0755 "$(DSTROOT)/$(SETUP_SA)"  "$(DSTROOT)/$(PROMO_SA)"
+	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(PROMO_DIR)
+	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_SETUP_DIR)/$(SRC_PROMO_SCRIPT)" "$(DSTROOT)/$(PROMO_DIR)/$(DST_PROMO_SCRIPT)"
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(PROMO_DIR)/$(DST_PROMO_SCRIPT)")
 
 	# Service runtime scripts
 	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin
-	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SA_LEARN)")
-	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SA_LEARN)")
-	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SA_LEARN)")
-	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SA_LEARN)")
-	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/learn_junk_mail" >> "$(DSTROOT)/$(SA_LEARN)")
-	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_LEARN)")
+	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_SETUP_DIR)/sa_learn.pl" "$(DSTROOT)/$(SA_LEARN_PATH)"
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_LEARN_PATH)")
 
-	$(_v) (/bin/echo "#!/bin/sh" > "$(DSTROOT)/$(SA_UPDATE)")
-	$(_v) (/bin/echo "#" >> "$(DSTROOT)/$(SA_UPDATE)")
-	$(_v) (/bin/echo "" >> "$(DSTROOT)/$(SA_UPDATE)")
-	$(_v) (/bin/echo "_server_root=$(SERVER_INSTALL_PATH_PREFIX)" >> "$(DSTROOT)/$(SA_UPDATE)")
-	$(_v) (/bin/cat "$(SRCROOT)/$(PROJECT_SETUP_DIR)/sa_update" >> "$(DSTROOT)/$(SA_UPDATE)")
-	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_UPDATE)")
+	$(_v) $(INSTALL_FILE) "$(SRCROOT)/$(PROJECT_SETUP_DIR)/sa_update.pl" "$(DSTROOT)/$(SA_UPDATE_PATH)"
+	$(_v) (/bin/chmod 755 "$(DSTROOT)/$(SA_UPDATE_PATH)")
 
 	$(_v) $(SED) -e 's/#loadplugin Mail::SpamAssassin::Plugin::TextCat/loadplugin Mail::SpamAssassin::Plugin::TextCat/' \
 			"$(V310_PRE)" > "$(V310_PRE_TMP)"
@@ -258,12 +246,12 @@ install-startup-files :
 	$(_v) $(INSTALL_DIRECTORY) $(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons
 	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_LD_DIR)/com.apple.salearn.plist \
 			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.salearn.plist
-	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_LD_DIR)/com.apple.updatesa.plist \
-			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.updatesa.plist
-	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/learn_junk_mail.sh' \
+	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_learn.pl' \
 			"$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.salearn.plist"
-	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/bin/sa-update' \
-			"$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.updatesa.plist"
+	$(_v) $(INSTALL_FILE) $(SRCROOT)/$(PROJECT_LD_DIR)/com.apple.saupdate.plist \
+			$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.saupdate.plist
+	/usr/libexec/PlistBuddy -c 'Set :Program $(SERVER_INSTALL_PATH_PREFIX)/usr/libexec/spamassassin/sa_update.pl' \
+			"$(DSTROOT)$(SERVER_INSTALL_PATH_PREFIX)$(NSLIBRARYDIR)/LaunchDaemons/com.apple.saupdate.plist"
 	@echo "***** Installing Startup Item complete."
 
 $(DSTROOT) $(TMPDIR) :
